@@ -4,16 +4,80 @@ import wave
 import datetime
 import tkinter as tk
 import winsound
+import os
+import sys
+import psutil
+import threading
 from threading import Thread
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
-# --- Cargar configuración desde JSON ---
-with open("config.json", "r", encoding="utf-8") as f:
-    config = json.load(f)
+class SingleInstance:
+    """Ensure only one instance of the program is running."""
+    def __init__(self):
+        self.lockfile = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'class_alerts.lock'))
+        
+    def check(self):
+        try:
+            if os.path.exists(self.lockfile):
+                # Check if process is actually running
+                with open(self.lockfile, 'r') as f:
+                    pid = int(f.read().strip())
+                try:
+                    # Check if the process is still running
+                    if psutil.Process(pid).is_running():
+                        return False
+                except psutil.NoSuchProcess:
+                    pass  # Process not found, we can proceed
+            
+            # Write current process ID to lockfile
+            with open(self.lockfile, 'w') as f:
+                f.write(str(os.getpid()))
+            return True
+            
+        except Exception as e:
+            print(f"Error checking single instance: {e}")
+            return True
+            
+    def cleanup(self):
+        try:
+            if os.path.exists(self.lockfile):
+                os.remove(self.lockfile)
+        except:
+            pass
 
-SOUNDS = config["sounds"]
-BANNER = config["banner"]
-MESSAGE = config["message_settings"]
-SCHEDULE = config["schedule"]
+class ConfigWatcher:
+    """Watch for changes in the config file and reload when necessary."""
+    def __init__(self):
+        self.config_path = "config.json"
+        self.last_modified = os.path.getmtime(self.config_path)
+        self.load_config()
+        
+    def load_config(self):
+        global SOUNDS, BANNER, MESSAGE, SCHEDULE
+        try:
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+            SOUNDS = config["sounds"]
+            BANNER = config["banner"]
+            MESSAGE = config["message_settings"]
+            SCHEDULE = config["schedule"]
+            print("Configuration loaded successfully")
+        except Exception as e:
+            print(f"Error loading configuration: {e}")
+            
+    def check_config(self):
+        try:
+            current_mtime = os.path.getmtime(self.config_path)
+            if current_mtime > self.last_modified:
+                print("Config file changed, reloading...")
+                self.load_config()
+                self.last_modified = current_mtime
+        except Exception as e:
+            print(f"Error checking config: {e}")
+
+# Initialize configuration
+config_watcher = ConfigWatcher()
 
 def get_wav_duration(wav_path):
     """Get the duration of a WAV file in seconds."""
@@ -84,8 +148,16 @@ def check_schedule():
     """Verifica continuamente el horario y lanza alertas."""
     triggered = set()
     while True:
-        now = datetime.datetime.now()
-        weekday = now.strftime("%A")
+        try:
+            # Check for config changes
+            config_watcher.check_config()
+            
+            now = datetime.datetime.now()
+            weekday = now.strftime("%A")
+        except Exception as e:
+            print(f"Error in schedule check: {e}")
+            time.sleep(60)  # Wait a minute before retrying
+            continue
 
         if weekday in SCHEDULE:
             for event in SCHEDULE[weekday]:
@@ -124,5 +196,27 @@ def check_schedule():
 
         time.sleep(20)
 
+def main():
+    # Check if another instance is running
+    instance = SingleInstance()
+    if not instance.check():
+        print("Another instance is already running")
+        sys.exit(1)
+
+    try:
+        # Reduce CPU priority
+        p = psutil.Process(os.getpid())
+        if os.name == 'nt':  # Windows
+            p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+        else:  # Unix-like
+            p.nice(10)  # Lower priority (higher nice value)
+
+        # Start the schedule checker
+        check_schedule()
+    except KeyboardInterrupt:
+        print("\nShutting down gracefully...")
+    finally:
+        instance.cleanup()
+
 if __name__ == "__main__":
-    check_schedule()
+    main()
