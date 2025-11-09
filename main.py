@@ -12,10 +12,15 @@ from threading import Thread
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# Base directory of the running script. When Windows starts apps at login the
-# current working directory may be different, so always resolve files relative
-# to the script location.
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Base directory of the running script. When the program is bundled into an
+# executable (PyInstaller) or run by Windows at startup, __file__ or the CWD
+# may not point to the folder with your resources. Prefer the executable
+# location when frozen; otherwise use the script folder.
+if getattr(sys, 'frozen', False):
+    # PyInstaller: resources are alongside the executable
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def resolve_path(p):
     """Return an absolute path for p. If p is already absolute return it as-is,
@@ -27,10 +32,31 @@ def resolve_path(p):
         return p
     return os.path.join(BASE_DIR, p)
 
+# Logging setup: overwrite log on each execution and provide a thread-safe writer.
+LOG_PATH = os.path.join(BASE_DIR, "log.txt")
+LOG_LOCK = threading.Lock()
+
+# Truncate log at startup
+with open(LOG_PATH, 'w', encoding='utf-8') as _f:
+    _f.write(f"Log started {datetime.datetime.now().isoformat(sep=' ', timespec='seconds')}\n")
+
+def write_log(message: str, level: str = "INFO"):
+    ts = datetime.datetime.now().isoformat(sep=' ', timespec='seconds')
+    line = f"{ts} [{level}] {message}\n"
+    try:
+        with LOG_LOCK:
+            with open(LOG_PATH, 'a', encoding='utf-8') as f:
+                f.write(line)
+    except Exception:
+        # Last-resort: swallow to avoid cascading failures during logging
+        pass
+
 class SingleInstance:
     """Ensure only one instance of the program is running."""
     def __init__(self):
-        self.lockfile = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'class_alerts.lock'))
+        # Keep lockfile next to the application so multiple copies in different
+        # folders don't collide.
+        self.lockfile = os.path.normpath(os.path.join(BASE_DIR, 'class_alerts.lock'))
         
     def check(self):
         try:
@@ -51,7 +77,7 @@ class SingleInstance:
             return True
             
         except Exception as e:
-            print(f"Error checking single instance: {e}")
+            write_log(f"Error checking single instance: {e}", "ERROR")
             return True
             
     def cleanup(self):
@@ -79,13 +105,57 @@ class ConfigWatcher:
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
-            SOUNDS = config["sounds"]
-            BANNER = config["banner"]
-            MESSAGE = config["message_settings"]
-            SCHEDULE = config["schedule"]
-            print("Configuration loaded successfully")
+            # Validate and assign configuration
+            SOUNDS = config.get("sounds", {})
+            BANNER = config.get("banner", BANNER)
+            MESSAGE = config.get("message_settings", MESSAGE)
+
+            # Validate schedule structure and values
+            raw_schedule = config.get("schedule", {})
+            valid_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+            validated_schedule = {}
+            for day, events in raw_schedule.items():
+                if day not in valid_days:
+                    write_log(f"Invalid day in schedule ignored: {day}", "WARNING")
+                    continue
+                validated_events = []
+                if not isinstance(events, list):
+                    write_log(f"Events for {day} must be a list; skipping.", "WARNING")
+                    continue
+                for ev in events:
+                    try:
+                        name = ev.get("name")
+                        start_str = ev.get("start")
+                        end_str = ev.get("end")
+                        alerts = ev.get("alerts", {})
+                        # Parse times
+                        start_t = datetime.datetime.strptime(start_str, "%H:%M").time()
+                        end_t = datetime.datetime.strptime(end_str, "%H:%M").time()
+                        # Ensure end is after start (same day)
+                        start_dt = datetime.datetime.combine(datetime.date.today(), start_t)
+                        end_dt = datetime.datetime.combine(datetime.date.today(), end_t)
+                        if end_dt <= start_dt:
+                            write_log(f"Event '{name}' on {day} has end <= start ({start_str} >= {end_str}); skipping.", "WARNING")
+                            continue
+                        validated_events.append({
+                            "name": name,
+                            "start": start_str,
+                            "end": end_str,
+                            "alerts": alerts,
+                        })
+                    except ValueError as ve:
+                        write_log(f"Time parse error in event on {day}: {ev} -- {ve}", "ERROR")
+                        continue
+                if validated_events:
+                    validated_schedule[day] = validated_events
+            SCHEDULE = validated_schedule
+            write_log("Configuration loaded successfully", "INFO")
         except Exception as e:
-            print(f"Error loading configuration: {e}")
+            # If JSON parsing error, report the exact exception
+            if isinstance(e, json.JSONDecodeError):
+                write_log(f"JSON parsing error in config: {e}", "ERROR")
+            else:
+                write_log(f"Error loading configuration: {e}", "ERROR")
             # Ensure sensible defaults so other parts of the program can run
             SOUNDS = {
                 "start": "sounds/start.wav",
@@ -113,11 +183,11 @@ class ConfigWatcher:
         try:
             current_mtime = os.path.getmtime(self.config_path)
             if current_mtime > self.last_modified:
-                print("Config file changed, reloading...")
+                write_log("Config file changed, reloading...", "INFO")
                 self.load_config()
                 self.last_modified = current_mtime
         except Exception as e:
-            print(f"Error checking config: {e}")
+            write_log(f"Error checking config: {e}", "ERROR")
 
 # Initialize configuration
 # Provide safe defaults so the module-level names exist even if config fails to
@@ -149,6 +219,7 @@ def get_wav_duration(wav_path):
             duration = frames / float(rate)
             return duration
     except:
+        write_log(f"Could not read WAV duration for {wav_path}; using default 2s", "WARNING")
         return 2  # Default duration if cannot read file
 
 def play_sound(sound_path, repetitions=1):
@@ -217,7 +288,7 @@ def check_schedule():
             now = datetime.datetime.now()
             weekday = now.strftime("%A")
         except Exception as e:
-            print(f"Error in schedule check: {e}")
+            write_log(f"Error in schedule check: {e}", "ERROR")
             time.sleep(60)  # Wait a minute before retrying
             continue
 
@@ -262,7 +333,7 @@ def main():
     # Check if another instance is running
     instance = SingleInstance()
     if not instance.check():
-        print("Another instance is already running")
+        write_log("Another instance is already running", "WARNING")
         sys.exit(1)
 
     try:
@@ -276,9 +347,10 @@ def main():
         # Start the schedule checker
         check_schedule()
     except KeyboardInterrupt:
-        print("\nShutting down gracefully...")
+        write_log("Shutting down gracefully (KeyboardInterrupt)", "INFO")
     finally:
         instance.cleanup()
+        write_log("Instance cleaned up, exiting.", "INFO")
 
 if __name__ == "__main__":
     main()
