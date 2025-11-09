@@ -3,7 +3,7 @@
     "start": "sounds/start.wav",
     "start_repetition": 3,
     "before_end": "sounds/warning.wav",
-    "before_end_repetition": 2,
+    "before_end_repetition": 3,
     "end": "sounds/end.wav",
     "end_repetition": 3
   },
@@ -26,14 +26,39 @@
   },
   "schedule": {
     "Monday": [
-      {"name": "Math", "start": "08:00", "end": "08:45", "alerts": {"start": true, "before_end": 5, "end": true}},
-      {"name": "Science", "start": "09:00", "end": "09:45", "alerts": {"start": true, "before_end": 5, "end": true}}
+      {"name": "G8 Mentor Check-in", "start": "08:10", "end": "08:20", "alerts": {"start": true, "before_end": false, "end": true}},
+      {"name": "G10 Computer Science", "start": "09:19", "end": "10:04", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G9 IGCSE ICT", "start": "10:16", "end": "11:01", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G9 US Computer Science", "start": "14:36", "end": "15:21", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "Luanti VCA", "start": "15:45", "end": "16:45", "alerts": {"start": true, "before_end": 5, "end": true}}
     ],
     "Tuesday": [
-      {"name": "History", "start": "08:00", "end": "08:45", "alerts": {"start": true, "before_end": 5, "end": true}}
+      {"name": "G8 Mentor Check-in", "start": "08:10", "end": "08:20", "alerts": {"start": true, "before_end": false, "end": true}},
+      {"name": "G8 Mentor Lesson", "start": "08:27", "end": "09:12", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G9 US Computer Science", "start": "10:16", "end": "11:01", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G9 IGCSE ICT", "start": "11:08", "end": "11:53", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G10 Computer Science", "start": "14:36", "end": "15:21", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "AI Creative Club", "start": "15:45", "end": "16:45", "alerts": {"start": true, "before_end": 5, "end": true}}
     ],
-    "Sunday": [
-      {"name": "Testing", "start": "15:31", "end": "15:36", "alerts": {"start": true, "before_end": 5, "end": true}}
+    "Wednesday": [
+      {"name": "G8 Mentor Check-in", "start": "08:10", "end": "08:20", "alerts": {"start": true, "before_end": false, "end": true}},
+      {"name": "G8 STEAM-5", "start": "09:19", "end": "10:34", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G8 STEAM-4", "start": "10:46", "end": "11:51", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G9 Computer Science", "start": "13:44", "end": "14:29", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G10 Computer Science", "start": "14:36", "end": "15:21", "alerts": {"start": true, "before_end": 5, "end": true}}
+    ],
+    "Thursday": [
+      {"name": "G8 Mentor Check-in", "start": "08:10", "end": "08:20", "alerts": {"start": true, "before_end": false, "end": true}},
+      {"name": "G9 IGCSE ICT", "start": "09:19", "end": "10:04", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G10 Computer Science", "start": "10:16", "end": "11:01", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G9 US Computer Science", "start": "13:44", "end": "14:29", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G9 Computer Science", "start": "14:36", "end": "15:21", "alerts": {"start": true, "before_end": 5, "end": true}}
+    ],
+    "Friday": [
+      {"name": "G8 Mentor Check-in", "start": "08:10", "end": "08:20", "alerts": {"start": true, "before_end": false, "end": true}},
+      {"name": "G9 IGCSE ICT", "start": "08:27", "end": "09:12", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G10 Computer Science", "start": "13:44", "end": "14:29", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "G9 Computer Science", "start": "14:36", "end": "15:21", "alerts": {"start": true, "before_end": 5, "end": true}}
     ]
   }
 }

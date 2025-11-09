@@ -12,6 +12,21 @@ from threading import Thread
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# Base directory of the running script. When Windows starts apps at login the
+# current working directory may be different, so always resolve files relative
+# to the script location.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def resolve_path(p):
+    """Return an absolute path for p. If p is already absolute return it as-is,
+    otherwise join it with BASE_DIR.
+    """
+    if not p:
+        return p
+    if os.path.isabs(p):
+        return p
+    return os.path.join(BASE_DIR, p)
+
 class SingleInstance:
     """Ensure only one instance of the program is running."""
     def __init__(self):
@@ -49,8 +64,14 @@ class SingleInstance:
 class ConfigWatcher:
     """Watch for changes in the config file and reload when necessary."""
     def __init__(self):
-        self.config_path = "config.json"
-        self.last_modified = os.path.getmtime(self.config_path)
+        # Use absolute path to the config file (script directory). This fixes
+        # the issue when Windows starts the app and the current working
+        # directory is not the script folder.
+        self.config_path = resolve_path("config.json")
+        try:
+            self.last_modified = os.path.getmtime(self.config_path)
+        except Exception:
+            self.last_modified = 0
         self.load_config()
         
     def load_config(self):
@@ -65,6 +86,28 @@ class ConfigWatcher:
             print("Configuration loaded successfully")
         except Exception as e:
             print(f"Error loading configuration: {e}")
+            # Ensure sensible defaults so other parts of the program can run
+            SOUNDS = {
+                "start": "sounds/start.wav",
+                "start_repetition": 1,
+                "before_end": "sounds/warning.wav",
+                "before_end_repetition": 1,
+                "end": "sounds/end.wav",
+                "end_repetition": 1,
+            }
+            BANNER = {"frame_thickness": 4}
+            MESSAGE = {
+                "font_family": "Segoe UI",
+                "font_size": 42,
+                "font_weight": "bold",
+                "color_start": "#FFFFFF",
+                "color_before_end": "#FFFFFF",
+                "color_end": "#FFFFFF",
+                "banner_start": "#2196F3",
+                "banner_before_end": "#00BCD4",
+                "banner_end": "#9C27B0",
+            }
+            SCHEDULE = {}
             
     def check_config(self):
         try:
@@ -77,11 +120,29 @@ class ConfigWatcher:
             print(f"Error checking config: {e}")
 
 # Initialize configuration
+# Provide safe defaults so the module-level names exist even if config fails to
+# load (prevents NameError when the watcher cannot read the file at startup).
+SOUNDS = {}
+BANNER = {"frame_thickness": 4}
+MESSAGE = {
+    "font_family": "Segoe UI",
+    "font_size": 42,
+    "font_weight": "bold",
+    "color_start": "#FFFFFF",
+    "color_before_end": "#FFFFFF",
+    "color_end": "#FFFFFF",
+    "banner_start": "#2196F3",
+    "banner_before_end": "#00BCD4",
+    "banner_end": "#9C27B0",
+}
+SCHEDULE = {}
+
 config_watcher = ConfigWatcher()
 
 def get_wav_duration(wav_path):
     """Get the duration of a WAV file in seconds."""
     try:
+        wav_path = resolve_path(wav_path)
         with wave.open(wav_path, 'rb') as wav_file:
             frames = wav_file.getnframes()
             rate = wav_file.getframerate()
@@ -95,7 +156,8 @@ def play_sound(sound_path, repetitions=1):
     def _play():
         for _ in range(repetitions):
             # Play sound synchronously to ensure one completes before the next starts
-            winsound.PlaySound(sound_path, winsound.SND_FILENAME)
+            sp = resolve_path(sound_path)
+            winsound.PlaySound(sp, winsound.SND_FILENAME)
     Thread(target=_play, daemon=True).start()
 
 def show_message(text, banner_color, text_color, sound_path=None, repetitions=1):
