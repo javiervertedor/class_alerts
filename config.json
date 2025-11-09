@@ -1,0 +1,39 @@
+{
+  "sounds": {
+    "start": "sounds/start.wav",
+    "start_repetition": 3,
+    "before_end": "sounds/warning.wav",
+    "before_end_repetition": 3,
+    "end": "sounds/end.wav",
+    "end_repetition": 3
+  },
+  "banner": {
+    "height": 150,
+    "frame_thickness": 4
+  },
+  "message_settings": {
+    "font_family": "Segoe UI",
+    "font_size": 42,
+    "font_weight": "bold",
+
+    "color_start": "#FFFFFF",
+    "color_before_end": "#FFFFFF",
+    "color_end": "#FFFFFF",
+
+    "banner_start": "#2196F3",
+    "banner_before_end": "#00BCD4",
+    "banner_end": "#9C27B0"
+  },
+  "schedule": {
+    "Monday": [
+      {"name": "Math", "start": "08:00", "end": "08:45", "alerts": {"start": true, "before_end": 5, "end": true}},
+      {"name": "Science", "start": "09:00", "end": "09:45", "alerts": {"start": true, "before_end": 5, "end": true}}
+    ],
+    "Tuesday": [
+      {"name": "History", "start": "08:00", "end": "08:45", "alerts": {"start": true, "before_end": 5, "end": true}}
+    ],
+    "Sunday": [
+      {"name": "Testing", "start": "14:45", "end": "14:51", "alerts": {"start": true, "before_end": 5, "end": true}}
+    ]
+  }
+}
